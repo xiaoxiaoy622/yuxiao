@@ -14,7 +14,7 @@
 |`玉箫加速.js`|**生产模块**，ES5 IIFE 封装，暴露 `window.$hookTimer` API|独立运行|
 |`xiao02.webm`|**吹箫引凤绿幕视频**（408×725，1:1.78 比例），触发球动画|被 `index.html` 引用|
 |`xiao\_x\_panel.png`|面板内**玉箫静态图片**（88×180，1:2.05 比例）|被 `index.html` 引用|
-|`xiao\_x\_transparent.png`|透明背景玉箫图片，微信内置浏览器（X5 WebView）不支持 AV1 解码，自动降级为透明背景图片。||
+|`xiao\_x\_transparent.png`|透明背景玉箫图片，微信内置浏览器（X5 WebView）不支持 AV1 解码，自动降级为透明背景图片。|被 `玉箫加速.js` 引用|
 
 ### 🎮 游戏原始资源（来自"斗罗大陆H5"）
 
