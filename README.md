@@ -56,16 +56,6 @@
 |Edge 80+|✅ 完全支持|
 |移动端 Chrome/Safari|✅ 完全支持（含触控优化）|
 
-\---
-
-## 注意事项
-
-1. **视频 playbackRate 上限**：浏览器限制 `video.playbackRate` 最大为 16x，超过 16x 的速度在视频上会 clamp 到 16x
-2. **Hook 后的 setInterval**：由于虚拟时间缩放，`setInterval` 的实际触发间隔会被缩放，可能导致某些轮询逻辑异常（已用 rAF 兜底修复）
-3. **localStorage 残留**：测试时可能残留拖拽位置/速度数据，刷新页面后会自动恢复
-4. **移动端 safe-area**：已支持刘海屏安全区（`env(safe-area-inset-\*)`）
-
-\---
 
 ## 免责声明
 
