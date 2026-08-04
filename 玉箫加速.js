@@ -197,7 +197,6 @@
         '#xiao-trigger:hover{transform:translateY(-50%) scale(1.05)}',
         '#xiao-trigger.fast .xiao-img{animation:xiaoImgBreath 2.2s ease-in-out infinite}',
         '@keyframes xiaoImgBreath{0%,100%{filter:url(#chromaKey) drop-shadow(0 0 6px rgba(74,156,204,.35))}50%{filter:url(#chromaKey) drop-shadow(0 0 16px rgba(74,204,240,.85))}}',
-        '#xiao-trigger.scrolled{opacity:.35;transform:translateY(-50%) scale(.92)}',
         '#xiao-trigger .xiao-img{width:100%;height:100%;display:block;object-fit:cover;border-radius:6px;background:transparent !important;pointer-events:none;filter:url(#chromaKey) drop-shadow(0 0 8px rgba(74,156,204,0.5))}',
         '.xiao-img-static{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;border-radius:6px;display:none;pointer-events:none;filter:drop-shadow(0 0 8px rgba(74,156,204,0.5));z-index:1}',
         '#xiao-trigger .xiao-speed-tag{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);background:var(--bamboo-dark);color:var(--paper);font-size:9px;font-weight:700;padding:2px 6px;border-radius:6px;white-space:nowrap;font-family:"Courier New",monospace;z-index:2;box-shadow:0 2px 6px rgba(0,0,0,.2);pointer-events:none}',
@@ -621,7 +620,6 @@
         function _togglePanel(open) {
             _panelOpen = typeof open === 'boolean' ? open : !_panelOpen;
             if (_panelOpen) {
-                _trigger.classList.remove('scrolled');
                 var isMobile = window.innerWidth <= 640;
                 _panel.classList.toggle('mobile-open', isMobile);
                 if (isMobile) {
@@ -854,20 +852,6 @@
                 _togglePersist();
             }
         });
-
-        // ===== 滚动自动半透明收起 =====
-        var _scrollT = 0;
-        function _onScroll() {
-            _trigger.classList.add('scrolled');
-            if (_scrollT) _origClearTimeout.call(window, _scrollT);
-            _scrollT = _origSetTimeout.call(window, function () {
-                _scrollT = 0;
-                _trigger.classList.remove('scrolled');
-            }, 1500);
-        }
-        window.addEventListener('scroll', _onScroll, { passive: true, capture: true });
-        document.addEventListener('touchmove', _onScroll, { passive: true });
-        _trigger.addEventListener('mouseenter', function () { _trigger.classList.remove('scrolled'); });
     }
 
     if (document.readyState === 'interactive' || document.readyState === 'complete') {
