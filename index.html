@@ -1,0 +1,889 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>箫声袅袅 · 玉箫加速</title>
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  /* 数学化响应式布局变量
+     触发球：高=clamp(200px,30vh,320px) 桌面 / clamp(140px,26vh,210px) 移动；
+             宽=高/1.78（视频 xiao02.webm 为 408×725 竖版比例）
+     面板：宽=clamp(300px,22vw,360px) 桌面 / min(100vw-24px,420px) 移动；
+           左=触发球右缘+8px 间隙（与拖拽逻辑 gap 一致）
+  */
+  --trig-left:max(16px, env(safe-area-inset-left));
+  --trig-h:clamp(200px,30vh,320px);
+  --trig-w:calc(var(--trig-h)/1.78);
+  --panel-gap:8px;
+  --panel-w:clamp(300px,22vw,360px);
+  --panel-left:calc(var(--trig-left) + var(--trig-w) + var(--panel-gap));
+  /* 按钮触控标准：网格/主操作/场景chip/洞音圆钮 */
+  --btn-h:clamp(34px,5.5vh,40px);
+  --btn-h-lg:clamp(38px,6.5vh,46px);
+  --btn-h-xs:clamp(28px,4.5vh,34px);
+  --hole-d:clamp(20px,4.5vw,28px);
+  --ink-deep:#1a1a1a;
+  --ink-mid:#3a3a3a;
+  --ink-light:#5a5a5a;
+  --bamboo-dark:#1a3a5c;
+  --bamboo-mid:#2a5a8c;
+  --bamboo-light:#4a9acc;
+  --jade:#4ac0f0;
+  --jade-light:#80d8ff;
+  --paper:#f5f0e6;
+  --paper-dark:#e8e0d0;
+  --red-seal:#c3272b;
+}
+html,body{width:100%;min-height:100vh;background:var(--paper);color:var(--ink-deep);font-family:'STKaiti','KaiTi','楷体',serif;overflow-x:hidden}
+
+.ink-bg{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;opacity:.6}
+.ink-blob{position:absolute;border-radius:50%;filter:blur(40px);animation:inkFloat 15s ease-in-out infinite}
+.ink-blob.b1{width:300px;height:200px;background:radial-gradient(ellipse,rgba(74,90,58,.12),transparent 70%);top:10%;left:10%;animation-delay:0s}
+.ink-blob.b2{width:250px;height:300px;background:radial-gradient(ellipse,rgba(122,184,160,.1),transparent 70%);top:40%;right:5%;animation-delay:-5s}
+.ink-blob.b3{width:200px;height:150px;background:radial-gradient(ellipse,rgba(90,90,90,.08),transparent 70%);bottom:15%;left:30%;animation-delay:-10s}
+@keyframes inkFloat{0%,100%{transform:translate(0,0) scale(1) rotate(0deg)}25%{transform:translate(20px,-15px) scale(1.05) rotate(2deg)}50%{transform:translate(-10px,-25px) scale(1.02) rotate(-1deg)}75%{transform:translate(-20px,10px) scale(.98) rotate(1deg)}}
+
+.demo-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:24px 16px;position:relative;z-index:1}
+.demo-title{font-size:26px;color:var(--ink-deep);margin-bottom:24px;letter-spacing:8px;font-weight:normal;position:relative}
+.demo-title::before{content:'箫';position:absolute;left:-48px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--bamboo-mid);opacity:.6}
+.demo-title::after{content:'韵';position:absolute;right:-48px;top:50%;transform:translateY(-50%);font-size:14px;color:var(--bamboo-mid);opacity:.6}
+.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:520px;width:100%}
+.demo-card{
+  background:rgba(255,255,255,.6);
+  border:1px solid rgba(74,90,58,.2);
+  border-radius:3px;
+  padding:14px;text-align:center;position:relative;
+  backdrop-filter:blur(4px);
+  box-shadow:0 4px 12px rgba(0,0,0,.04);
+  transform-style:preserve-3d;
+  transition:transform .3s ease,box-shadow .3s ease;
+}
+.demo-card:hover{
+  transform:perspective(400px) rotateX(3deg) rotateY(-3deg) translateY(-3px);
+  box-shadow:0 8px 24px rgba(0,0,0,.08),0 0 20px var(--theme-glow);
+}
+.demo-card::after{
+  content:'';position:absolute;inset:0;border-radius:4px;pointer-events:none;
+  background:radial-gradient(circle at var(--card-mx,50%) var(--card-my,50%),rgba(255,255,255,.35),transparent 60%);
+  opacity:0;transition:opacity .3s ease;
+}
+.demo-card:hover::after{opacity:1}
+.demo-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--bamboo-mid),transparent);
+  opacity:.5;
+}
+.demo-label{font-size:10px;color:var(--ink-light);margin-bottom:6px;letter-spacing:3px}
+#demo-clock{font-size:20px;color:var(--ink-deep);font-variant-numeric:tabular-nums;letter-spacing:1px;font-family:'Courier New',monospace}
+#counterVal{font-size:28px;color:var(--bamboo-dark);font-weight:900}
+.progress-track{width:100%;height:4px;background:rgba(74,90,58,.1);border-radius:2px;overflow:hidden;margin-top:6px}
+#demo-progress{height:100%;width:0%;background:linear-gradient(90deg,var(--bamboo-mid),var(--jade));border-radius:2px}
+.spinner-wrap{display:flex;justify-content:center;margin-top:4px}
+
+/* ========== FLOATING XIAO TRIGGER ========== */
+#xiao-trigger{
+  position:fixed;top:50%;left:var(--trig-left);transform:translateY(-50%);
+  z-index:99999;
+  width:var(--trig-w);height:var(--trig-h);
+  cursor:grab;user-select:none;
+  touch-action:none;
+  transition:transform .3s ease;
+}
+#xiao-trigger:hover{transform:translateY(-50%) scale(1.06)}
+#xiao-trigger.dragging{cursor:grabbing}
+#xiao-trigger video{
+  width:100%;height:100%;display:block;
+  border-radius:8px;
+  background:transparent !important;
+  pointer-events:none;
+  object-fit:cover;
+  filter:url(#chromaKey) drop-shadow(0 0 10px rgba(74,156,204,0.5));
+}
+
+.xiao-speed-tag{
+  position:absolute;top:auto;bottom:-22px;left:50%;
+  transform:translateX(-50%);
+  background:var(--bamboo-dark);
+  color:var(--paper);
+  font-size:clamp(10px,1.2vw,12px);font-weight:700;
+  padding:clamp(2px,.3vh,4px) clamp(8px,1.2vw,12px);
+  border-radius:8px;
+  white-space:nowrap;
+  font-family:'Courier New',monospace;
+  z-index:2;
+  box-shadow:0 2px 6px rgba(0,0,0,.2);
+  pointer-events:none;
+}
+
+.sound-waves{
+  position:absolute;top:6px;right:100%;
+  width:clamp(48px,5vw,64px);height:clamp(24px,3vh,32px);
+  pointer-events:none;
+  overflow:visible;
+}
+.sound-wave{
+  position:absolute;top:50%;right:0;
+  transform:translateY(-50%);
+  width:14px;height:14px;
+  border:1.5px solid #4ac0f0;
+  border-radius:50%;
+  opacity:0;
+  animation:waveExpand 2s ease-out infinite;
+}
+.sound-wave:nth-child(1){animation-delay:0s}
+.sound-wave:nth-child(2){animation-delay:.5s}
+.sound-wave:nth-child(3){animation-delay:1s}
+@keyframes waveExpand{
+  0%{width:8px;height:8px;opacity:.6;right:0}
+  100%{width:60px;height:60px;opacity:0;right:40px}
+}
+
+.ink-ripple{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:0;height:0;border-radius:50%;
+  border:2px solid var(--jade);opacity:0;pointer-events:none;
+}
+.ink-ripple.active{animation:inkRipple .6s ease-out forwards}
+@keyframes inkRipple{
+  0%{width:0;height:0;opacity:.6;border-width:3px}
+  100%{width:120px;height:120px;opacity:0;border-width:1px}
+}
+
+/* ========== PANEL ========== */
+#xiao-panel{
+  position:fixed;top:50%;left:calc(-1 * var(--panel-w) - 24px);
+  transform:translateY(-50%);
+  z-index:99998;
+  width:var(--panel-w);
+  max-height:calc(100vh - 20px);
+  transition:left .4s cubic-bezier(.4,0,.2,1),opacity .3s ease;
+  opacity:0;visibility:hidden;
+}
+#xiao-panel.open{left:var(--panel-left);opacity:1;visibility:visible}
+
+.panel-body{
+  background:linear-gradient(180deg,rgba(255,252,245,.98),rgba(245,240,230,.98));
+  border:1px solid rgba(74,90,58,.25);
+  border-radius:6px;padding:0 16px 16px;position:relative;
+  box-shadow:0 12px 40px rgba(0,0,0,.12);
+  backdrop-filter:blur(10px);
+  overflow:hidden;
+  max-height:calc(100vh - 20px);
+  overflow-y:auto;
+}
+.panel-body::-webkit-scrollbar{width:6px}
+.panel-body::-webkit-scrollbar-thumb{background:rgba(74,90,58,.25);border-radius:3px}
+.panel-body::-webkit-scrollbar-track{background:transparent}
+.panel-body::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:4px;
+  background:linear-gradient(90deg,var(--bamboo-dark),var(--bamboo-mid),var(--jade),var(--bamboo-mid),var(--bamboo-dark));
+}
+.panel-body::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(74,90,58,.2),transparent);
+}
+.bamboo-flow-light{
+  position:absolute;top:2px;width:18px;height:4px;
+  background:radial-gradient(ellipse,rgba(160,216,192,.85),transparent 70%);
+  border-radius:50%;animation:bambooFlow 3s linear infinite;
+  pointer-events:none;filter:blur(.5px);
+}
+@keyframes bambooFlow{
+  0%{left:-5%;opacity:0}15%{opacity:.9}85%{opacity:.9}100%{left:105%;opacity:0}
+}
+.panel-header{padding:16px 0 10px;text-align:center;border-bottom:1px solid rgba(74,90,58,.1);margin-bottom:12px;position:relative}
+.panel-title{font-size:clamp(18px,2.4vw,22px);color:var(--ink-deep);letter-spacing:6px;font-weight:normal}
+.panel-subtitle{font-size:clamp(9px,1vw,11px);color:var(--ink-light);letter-spacing:3px;margin-top:4px}
+.panel-seal{
+  position:absolute;top:14px;left:0;width:30px;height:30px;
+  border:2px solid var(--red-seal);border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--red-seal);font-size:9px;font-weight:900;
+  letter-spacing:1px;opacity:.7;transform:rotate(-8deg);
+  transition:transform .35s cubic-bezier(.34,1.56,.64,1),box-shadow .35s ease,opacity .3s ease;
+}
+.panel-seal.stamped{transform:rotate(0deg) scale(1.15);box-shadow:0 4px 16px rgba(195,39,43,.35);opacity:1}
+
+.panel-xiao-wrap{display:flex;justify-content:center;align-items:center;gap:16px;padding:6px 0 12px;position:relative}
+.panel-xiao{width:clamp(56px,10vw,92px);height:calc(clamp(56px,10vw,92px)*2.05);position:relative;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.panel-xiao img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 6px rgba(80,180,230,.3))}
+
+.wave-vis{flex:1;height:clamp(100px,17vh,150px);position:relative;display:flex;align-items:center;justify-content:center}
+.wave-vis svg{width:100%;height:100%}
+
+.speed-display{text-align:center;margin-bottom:12px;padding:10px 14px;border:1px solid rgba(74,90,58,.15);border-radius:4px;background:rgba(74,90,58,.03);position:relative}
+.speed-display::before,.speed-display::after{
+  content:'♪';position:absolute;top:50%;transform:translateY(-50%);
+  color:var(--jade);font-size:12px;opacity:.5;
+}
+.speed-display::before{left:10px}
+.speed-display::after{right:10px}
+.speed-num{font-size:clamp(28px,5vw,38px);font-weight:normal;color:var(--bamboo-dark);font-family:'Courier New',monospace;line-height:1;letter-spacing:-2px}
+.speed-unit{font-size:clamp(11px,1.4vw,13px);color:var(--ink-light);margin-left:3px;font-weight:normal}
+.speed-mood{font-size:clamp(10px,1.2vw,12px);color:var(--jade);margin-top:4px;letter-spacing:2px}
+
+.hole-selector{display:flex;justify-content:center;gap:8px;margin-bottom:12px;padding:10px;background:rgba(74,90,58,.03);border-radius:4px;border:1px solid rgba(74,90,58,.1)}
+.hole-group{display:flex;flex-direction:column;align-items:center;gap:4px}
+.hole-btn{
+  width:var(--hole-d);height:var(--hole-d);border-radius:50%;
+  border:2px solid var(--bamboo-mid);background:var(--paper);
+  cursor:pointer;position:relative;transition:all .2s ease;padding:0;
+}
+.hole-btn:hover{transform:scale(1.1);border-color:var(--bamboo-dark)}
+.hole-btn.active{background:var(--bamboo-dark);border-color:var(--bamboo-dark);box-shadow:0 0 10px rgba(74,90,58,.4)}
+.hole-btn.active::after{
+  content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:6px;height:6px;background:var(--jade-light);border-radius:50%;
+}
+.hole-label{font-size:8px;color:var(--ink-light);letter-spacing:1px}
+
+.speed-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.speed-btn{
+  height:var(--btn-h);border:1px solid rgba(74,90,58,.2);
+  background:rgba(255,255,255,.5);color:var(--ink-mid);font-family:inherit;
+  font-size:clamp(11px,1.4vw,13px);font-weight:600;cursor:pointer;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;transition:all .2s ease;
+}
+.speed-btn:hover{background:rgba(74,90,58,.1);border-color:var(--bamboo-mid)}
+.speed-btn.active{background:var(--bamboo-dark);border-color:var(--bamboo-dark);color:var(--paper)}
+
+.speed-slider-wrap{margin-bottom:10px;padding:8px 12px;border:1px solid rgba(74,90,58,.15);border-radius:4px;background:rgba(74,90,58,.03)}
+.speed-slider-label{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--ink-light);margin-bottom:6px;letter-spacing:2px}
+.speed-slider-label span:last-child{color:var(--theme-accent);font-weight:700}
+.speed-slider{
+  -webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;
+  background:linear-gradient(90deg,var(--bamboo-light) 0%,var(--bamboo-mid) 25%,var(--bamboo-dark) 50%,var(--jade) 75%,var(--jade-light) 100%);
+  outline:none;cursor:pointer;
+}
+.speed-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:clamp(14px,2.4vw,18px);height:clamp(14px,2.4vw,18px);border-radius:50%;
+  background:var(--paper);border:2px solid var(--theme-accent);
+  box-shadow:0 1px 4px rgba(0,0,0,.15),0 0 6px var(--theme-glow);
+  cursor:grab;transition:transform .2s ease,box-shadow .2s ease;
+}
+.speed-slider::-webkit-slider-thumb:hover{transform:scale(1.15)}
+.speed-slider::-moz-range-thumb{
+  width:clamp(14px,2.4vw,18px);height:clamp(14px,2.4vw,18px);border-radius:50%;
+  background:var(--paper);border:2px solid var(--theme-accent);
+  box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:grab;
+}
+
+.scene-presets{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap;justify-content:center}
+.scene-btn{
+  height:var(--btn-h-xs);padding:0 clamp(8px,1.2vw,12px);border:1px solid rgba(74,90,58,.2);
+  background:rgba(255,255,255,.5);color:var(--ink-mid);font-family:inherit;
+  font-size:clamp(10px,1.1vw,12px);cursor:pointer;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .25s ease;letter-spacing:1px;white-space:nowrap;
+}
+.scene-btn:hover{background:var(--theme-accent);color:var(--paper);border-color:var(--theme-accent);transform:translateY(-1px);box-shadow:0 2px 6px var(--theme-glow)}
+.scene-btn.active{background:var(--theme-accent);color:var(--paper);border-color:var(--theme-accent)}
+
+.panel-controls{display:flex;gap:8px;align-items:center;justify-content:space-between}
+.ctrl-btn{
+  flex:1;height:var(--btn-h-lg);border:1px solid rgba(74,90,58,.2);
+  background:rgba(255,255,255,.5);color:var(--ink-mid);font-family:inherit;
+  font-size:clamp(11px,1.3vw,13px);cursor:pointer;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .2s ease;letter-spacing:2px;
+}
+.ctrl-btn:hover{background:rgba(74,90,58,.1);border-color:var(--bamboo-mid)}
+.ctrl-btn.active-persist{background:rgba(195,39,43,.1);border-color:var(--red-seal);color:var(--red-seal)}
+.ctrl-btn-reset:hover{background:rgba(195,39,43,.08);border-color:var(--red-seal);color:var(--red-seal)}
+
+.panel-close{
+  position:absolute;top:10px;right:10px;width:clamp(24px,2.8vw,30px);height:clamp(24px,2.8vw,30px);
+  border:1px solid rgba(74,90,58,.2);background:rgba(255,255,255,.5);
+  color:var(--ink-light);font-size:12px;cursor:pointer;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;transition:all .2s;z-index:10;
+}
+.panel-close:hover{background:var(--bamboo-dark);color:var(--paper);border-color:var(--bamboo-dark);transform:rotate(90deg)}
+
+.kb-hint{text-align:center;margin-top:8px;font-size:9px;color:var(--ink-light);letter-spacing:2px;opacity:.6}
+
+.ink-splash{
+  position:absolute;top:50%;left:50%;width:6px;height:6px;border-radius:50%;
+  background:radial-gradient(circle,rgba(122,184,160,.85),rgba(74,90,58,.4) 60%,transparent);
+  pointer-events:none;animation:inkSplash .6s ease-out forwards;
+}
+@keyframes inkSplash{
+  0%{transform:translate(0,0) scale(.3);opacity:.9}
+  70%{opacity:.7}
+  100%{transform:translate(var(--tx),var(--ty)) scale(.1);opacity:0}
+}
+.ink-ripple-layer{position:fixed;pointer-events:none;z-index:1;width:100%;height:100%;left:0;top:0;overflow:hidden}
+.ink-ring{
+  position:absolute;border-radius:50%;
+  border:1px solid var(--theme-accent);
+  box-shadow:0 0 12px var(--theme-glow),inset 0 0 12px var(--theme-glow);
+  pointer-events:none;animation:inkRingExpand 1.2s ease-out forwards;
+}
+@keyframes inkRingExpand{
+  0%{width:0;height:0;opacity:.7;border-width:3px}
+  100%{width:180px;height:180px;opacity:0;border-width:1px}
+}
+.particle-flow-layer{position:fixed;pointer-events:none;z-index:99997;overflow:visible}
+.xiao-particle{
+  position:absolute;width:4px;height:4px;border-radius:50%;
+  background:radial-gradient(circle,rgba(160,216,192,.9),rgba(122,184,160,.3) 70%,transparent);
+  pointer-events:none;animation:particleFloat var(--p-dur,2s) ease-out forwards;filter:blur(.3px);
+}
+@keyframes particleFloat{
+  0%{transform:translate(0,0) scale(1);opacity:.85}
+  60%{opacity:.6}
+  100%{transform:translate(var(--p-tx,0),var(--p-ty,-60px)) scale(.2);opacity:0}
+}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.speed-num{transition:color .3s ease,text-shadow .3s ease}
+.speed-mood{transition:opacity .3s ease,transform .3s ease}
+.speed-mood.flash{animation:moodFlash .4s ease}
+@keyframes moodFlash{0%{opacity:.3;transform:translateY(4px)}100%{opacity:1;transform:translateY(0)}}
+.hole-btn:focus-visible{outline:2px solid var(--jade);outline-offset:2px}
+.speed-btn:focus-visible,.ctrl-btn:focus-visible{outline:2px solid var(--jade);outline-offset:2px}
+.sound-wave{animation-duration:var(--wave-dur,2s)}
+
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(115deg,transparent 0px,transparent 3px,rgba(120,100,70,.015) 3px,rgba(120,100,70,.015) 4px),
+    repeating-linear-gradient(25deg,transparent 0px,transparent 7px,rgba(100,80,60,.01) 7px,rgba(100,80,60,.01) 8px);
+  opacity:.4;
+}
+
+:root{--theme-accent:var(--bamboo-dark);--theme-glow:rgba(74,90,58,.3)}
+body[data-speed="0.5"]{--theme-accent:#5a7a9c;--theme-glow:rgba(90,122,156,.25)}
+body[data-speed="1"]{--theme-accent:#2a5a8c;--theme-glow:rgba(42,90,140,.3)}
+body[data-speed="2"]{--theme-accent:#4a9acc;--theme-glow:rgba(74,154,204,.35)}
+body[data-speed="5"]{--theme-accent:#4ac0f0;--theme-glow:rgba(74,192,240,.4)}
+body[data-speed="20"]{--theme-accent:#80d8ff;--theme-glow:rgba(128,216,255,.45)}
+.speed-num{color:var(--theme-accent)}
+.hole-btn.active{background:var(--theme-accent);border-color:var(--theme-accent);box-shadow:0 0 14px var(--theme-glow)}
+.hole-btn.active::after{background:var(--jade-light)}
+.speed-btn.active{background:var(--theme-accent);border-color:var(--theme-accent)}
+.speed-mood{color:var(--theme-accent);text-shadow:0 0 8px var(--theme-glow)}
+#demo-progress{background:linear-gradient(90deg,var(--theme-accent),var(--jade))}
+
+@media (prefers-reduced-motion:reduce){
+  .ink-blob,.sound-wave,.ink-ripple,.speed-mood.flash{animation-duration:.01ms !important;animation-iteration-count:1 !important}
+  #xiao-trigger:hover{transform:none}
+  .scene-btn:hover,.speed-slider::-webkit-slider-thumb:hover{transform:none}
+}
+@media (max-width:768px){
+  /* 移动端/平板竖屏：触发球随高度缩放、面板满宽限 420px、按钮达触控标准 */
+  :root{
+    --trig-left:max(10px, env(safe-area-inset-left));
+    --trig-h:clamp(140px,26vh,210px);
+    --panel-w:min(calc(100vw - 24px), 420px);
+    --btn-h:clamp(36px,7vh,44px);
+    --btn-h-lg:clamp(40px,8vh,48px);
+    --btn-h-xs:clamp(30px,5.5vh,38px);
+    --hole-d:clamp(22px,6vw,30px);
+  }
+  #xiao-panel{left:calc(-1 * var(--panel-w) - 12px)}
+  #xiao-panel.open{left:max(8px, env(safe-area-inset-left))}
+  .panel-xiao{width:clamp(48px,13vw,68px);height:calc(clamp(48px,13vw,68px)*2.05)}
+  .wave-vis{height:clamp(80px,17vh,120px)}
+  .panel-body{padding:0 14px 14px}
+  .demo-grid{grid-template-columns:1fr;gap:12px}
+  .demo-title{font-size:clamp(20px,6vw,26px);letter-spacing:6px;margin-bottom:18px}
+  .speed-grid{gap:6px}
+}
+@media (max-width:480px){
+  .panel-body{padding:0 12px 12px}
+  .panel-header{padding:12px 0 8px;margin-bottom:8px}
+  .panel-title{font-size:clamp(17px,4.5vw,19px);letter-spacing:4px}
+  .panel-xiao-wrap{gap:10px}
+  .speed-display{padding:8px 10px}
+  .speed-num{font-size:clamp(26px,8vw,30px)}
+  .hole-selector{padding:8px;gap:6px}
+}
+@media (max-width:1024px) and (max-height:480px){
+  /* 横屏手机/矮窗口：触发球与按钮进一步压缩，避免遮挡内容 */
+  :root{
+    --trig-h:clamp(90px,26vh,140px);
+    --btn-h:clamp(30px,6vh,36px);
+    --btn-h-lg:clamp(34px,7vh,40px);
+    --btn-h-xs:clamp(26px,5vh,32px);
+    --hole-d:clamp(18px,4vw,24px);
+  }
+  .panel-xiao{width:clamp(42px,10vh,56px);height:calc(clamp(42px,10vh,56px)*2.05)}
+  .wave-vis{height:clamp(64px,14vh,90px)}
+  .speed-num{font-size:clamp(24px,6vh,30px)}
+}
+</style>
+</head>
+<body>
+
+<div class="ink-bg"><div class="ink-blob b1"></div><div class="ink-blob b2"></div><div class="ink-blob b3"></div></div>
+
+<div class="demo-wrap">
+  <div class="demo-title">箫声袅袅</div>
+  <div class="demo-grid">
+    <div class="demo-card"><div class="demo-label">清韵时钟</div><div id="demo-clock">00:00:00.000</div></div>
+    <div class="demo-card"><div class="demo-label">韵律计数</div><div id="counterVal">0</div></div>
+    <div class="demo-card"><div class="demo-label">旋律进度</div><div class="progress-track"><div id="demo-progress"></div></div></div>
+    <div class="demo-card"><div class="demo-label">音符旋转</div><div class="spinner-wrap">
+      <svg viewBox="0 0 44 44" style="width:44px;height:44px;animation:spin 3s linear infinite">
+        <defs><linearGradient id="noteGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#6a7a4a"/><stop offset="100%" stop-color="#7ab8a0"/></linearGradient></defs>
+        <text x="22" y="30" text-anchor="middle" font-size="24" fill="url(#noteGrad)">&#9834;</text>
+      </svg>
+    </div></div>
+  </div>
+</div>
+
+<!-- SVG Chroma-Key Filter (removes green background, works on file://) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="position:absolute;width:0;height:0;pointer-events:none" aria-hidden="true">
+  <defs>
+    <filter id="chromaKey" color-interpolation-filters="sRGB" x="0%" y="0%" width="100%" height="100%">
+      <!-- Video background: rgb(60,80,46) → normalized (0.235, 0.314, 0.180) -->
+      <!-- Step 1: subtract bg color from each pixel -->
+      <feColorMatrix type="matrix" values="
+        1 0 0 0 -0.235
+        0 1 0 0 -0.314
+        0 0 1 0 -0.180
+        0 0 0 1 0" result="d"/>
+      <!-- Step 2: sum RGB diff → alpha (bg→0 transparent, subject→opaque) -->
+      <feColorMatrix in="d" type="matrix" values="
+        0 0 0 0 0
+        0 0 0 0 0
+        0 0 0 0 0
+        3.5 3.5 3.5 0 -0.8" result="a"/>
+      <!-- Step 3: keep source where alpha mask says opaque -->
+      <feComposite in="SourceGraphic" in2="a" operator="in"/>
+    </filter>
+  </defs>
+</svg>
+
+<!-- FLOATING XIAO TRIGGER (Chroma-Key Video) -->
+<div id="xiao-trigger" title="点击展开 · 拖拽移动" role="button" aria-label="玉箫加速触发器">
+  <div class="sound-waves">
+    <div class="sound-wave"></div>
+    <div class="sound-wave"></div>
+    <div class="sound-wave"></div>
+  </div>
+  <video id="xiaoVideo" src="xiao02.webm" autoplay loop muted playsinline preload="auto"></video>
+  <span class="xiao-speed-tag" id="xiaoSpeedTag">1x</span>
+  <div class="ink-ripple" id="inkRipple"></div>
+</div>
+
+<!-- PANEL -->
+<div id="xiao-panel" role="dialog" aria-label="加速控制面板">
+  <div class="panel-body" role="document">
+    <div class="bamboo-flow-light" id="bambooFlowLight"></div>
+    <button class="panel-close" id="panel-close" title="关闭">&times;</button>
+    <div class="panel-seal">玉箫</div>
+    <div class="panel-header">
+      <div class="panel-title">箫声袅袅</div>
+      <div class="panel-subtitle">吹箫引凤 &middot; 光阴似箭</div>
+    </div>
+    <div class="panel-xiao-wrap">
+      <div class="panel-xiao" id="panelXiao">
+        <img src="xiao_x_panel.png" alt="玉箫">
+      </div>
+      <div class="wave-vis">
+        <svg viewBox="0 0 100 180" id="waveSvg">
+          <defs>
+            <linearGradient id="waveGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#4a9acc" stop-opacity=".6"/>
+              <stop offset="50%" stop-color="#2a5a8c" stop-opacity=".8"/>
+              <stop offset="100%" stop-color="#4a9acc" stop-opacity=".6"/>
+            </linearGradient>
+          </defs>
+          <g stroke="url(#waveGrad)" fill="none" stroke-width="1.5">
+            <path id="wave1" d="M0,90 Q25,60 50,90 T100,90" opacity=".3">
+              <animate attributeName="d" values="M0,90 Q25,60 50,90 T100,90;M0,90 Q25,120 50,90 T100,90;M0,90 Q25,60 50,90 T100,90" dur="2s" repeatCount="indefinite"/>
+            </path>
+            <path id="wave2" d="M0,90 Q25,50 50,90 T100,90" opacity=".5">
+              <animate attributeName="d" values="M0,90 Q25,50 50,90 T100,90;M0,90 Q25,130 50,90 T100,90;M0,90 Q25,50 50,90 T100,90" dur="1.5s" repeatCount="indefinite"/>
+            </path>
+            <path id="wave3" d="M0,90 Q25,40 50,90 T100,90" opacity=".7">
+              <animate attributeName="d" values="M0,90 Q25,40 50,90 T100,90;M0,90 Q25,140 50,90 T100,90;M0,90 Q25,40 50,90 T100,90" dur="1s" repeatCount="indefinite"/>
+            </path>
+          </g>
+        </svg>
+      </div>
+    </div>
+    <div class="speed-display">
+      <span class="speed-num" id="speedNum">1</span><span class="speed-unit">倍速</span>
+      <div class="speed-mood" id="speedMood">清风徐来</div>
+    </div>
+    <div class="speed-slider-wrap">
+      <div class="speed-slider-label"><span>调速</span><span id="sliderVal">1x</span></div>
+      <input type="range" class="speed-slider" id="speedSlider" min="0.2" max="100" step="0.1" value="1" aria-label="无级调速滑杆">
+    </div>
+    <div class="scene-presets" id="scenePresets">
+      <button class="scene-btn" data-scene="春眠" data-speed="0.5" aria-label="春眠不觉晓 0.5倍速">春眠</button>
+      <button class="scene-btn active" data-scene="闲雅" data-speed="1" aria-label="闲雅平常 1倍速">闲雅</button>
+      <button class="scene-btn" data-scene="飞流" data-speed="5" aria-label="飞流直下 5倍速">飞流</button>
+      <button class="scene-btn" data-scene="荏苒" data-speed="20" aria-label="时光荏苒 20倍速">荏苒</button>
+    </div>
+    <div class="hole-selector" id="holeSelector">
+      <div class="hole-group"><button class="hole-btn" data-speed="0.5" data-hole="0" aria-label="缓 0.5倍速"></button><span class="hole-label">缓</span></div>
+      <div class="hole-group"><button class="hole-btn active" data-speed="1" data-hole="1" aria-label="平 1倍速"></button><span class="hole-label">平</span></div>
+      <div class="hole-group"><button class="hole-btn" data-speed="2" data-hole="2" aria-label="舒 2倍速"></button><span class="hole-label">舒</span></div>
+      <div class="hole-group"><button class="hole-btn" data-speed="5" data-hole="3" aria-label="急 5倍速"></button><span class="hole-label">急</span></div>
+      <div class="hole-group"><button class="hole-btn" data-speed="20" data-hole="4" aria-label="骤 20倍速"></button><span class="hole-label">骤</span></div>
+    </div>
+    <div class="speed-grid" id="speedGrid"></div>
+    <div class="panel-controls">
+      <button class="ctrl-btn" id="btn-persist">铭记</button>
+      <button class="ctrl-btn ctrl-btn-reset" id="btn-reset">归韵</button>
+    </div>
+    <div class="kb-hint">[ 缓 ] 急 &middot; 0 归韵 &middot; P 铭记 &middot; Esc 闭</div>
+  </div>
+</div>
+
+<div class="ink-ripple-layer" id="inkRippleLayer"></div>
+<div class="particle-flow-layer" id="particleFlowLayer"></div>
+
+<!-- CORE TIMER HOOK -->
+<script>
+(function(){'use strict';var _origSetTimeout=window.setTimeout,_origClearTimeout=window.clearTimeout,_origSetInterval=window.setInterval,_origClearInterval=window.clearInterval,_origDate=window.Date,_origDateNow=_origDate.now.bind?_origDate.now.bind(_origDate):function(){return _origDate.now()},_origDateParse=_origDate.parse,_origDateUTC=_origDate.UTC,_percentage=1,_timeoutIds={},_intervalIds={},_autoUniqueId=1,_hooksInstalled=false,_lastRealTime=_origDateNow(),_lastVirtualTime=_origDateNow();function genUniqueId(){return _autoUniqueId++}function notifyExec(u){if(!u)return;var k=Object.keys(_timeoutIds);for(var i=0;i<k.length;i++){var inf=_timeoutIds[k[i]];if(inf.uniqueId===u){_origClearTimeout.call(window,inf.nowId);delete _timeoutIds[inf.originId]}}}function hookedSetTimeout(){var u=genUniqueId(),cb=arguments[0];if(typeof cb==='function'){var _cb=cb;arguments[0]=function(){var r=_cb.apply(this,arguments);notifyExec(u);return r}}var ms=arguments[1];arguments[1]=(ms||0)*_percentage;var rid=_origSetTimeout.apply(window,arguments);_timeoutIds[rid]={args:arguments,originMS:ms,originId:rid,nowId:rid,uniqueId:u,oldPercentage:_percentage,exceptNextFireTime:_origDateNow()+(ms||0)};return rid}function hookedSetInterval(){var u=genUniqueId(),cb=arguments[0];if(typeof cb==='function'){var _cb=cb;arguments[0]=function(){var r=_cb.apply(this,arguments);notifyExec(u);return r}}var ms=arguments[1];arguments[1]=(ms||0)*_percentage;var rid=_origSetInterval.apply(window,arguments);_intervalIds[rid]={args:arguments,originMS:ms,originId:rid,nowId:rid,uniqueId:u,oldPercentage:_percentage,exceptNextFireTime:_origDateNow()+(ms||0)};return rid}function hookedClearTimeout(){var id=arguments[0];if(_timeoutIds[id]){arguments[0]=_timeoutIds[id].nowId;delete _timeoutIds[id]}return _origClearTimeout.apply(window,arguments)}function hookedClearInterval(){var id=arguments[0];if(_intervalIds[id]){arguments[0]=_intervalIds[id].nowId;delete _intervalIds[id]}return _origClearInterval.apply(window,arguments)}var _hookTimer={setSpeed:function(pct){if(typeof pct!=='number'||pct<=0)pct=1;var now=_origDateNow();var realDelta=now-_lastRealTime;_lastVirtualTime+=realDelta*pct;_lastRealTime=now;_percentage=pct;var k;for(k in _timeoutIds){var t=_timeoutIds[k];var elapsed=now-t.exceptNextFireTime+t.originMS;var newRemain=Math.max(0,(t.originMS-elapsed)*pct);_origClearTimeout.call(window,t.nowId);t.nowId=_origSetTimeout.call(window,t.args[0],newRemain);t.nowId}for(k in _intervalIds){var iv=_intervalIds[k];_origClearInterval.call(window,iv.nowId);iv.args[1]=(iv.originMS||0)*_percentage;iv.nowId=_origSetInterval.apply(window,iv.args)}},getSpeed:function(){return _percentage},virtualNow:function(){return _lastVirtualTime},hook:function(){if(_hooksInstalled)return;_hooksInstalled=true;window.setTimeout=hookedSetTimeout;window.clearTimeout=hookedClearTimeout;window.setInterval=hookedSetInterval;window.clearInterval=hookedClearInterval;window.Date=function(){if(arguments.length===0)return new _origDate(_lastVirtualTime);if(this instanceof _origDate)return new _origDate(_lastVirtualTime);return _origDate.apply(this,arguments)};window.Date.now=function(){return _lastVirtualTime};window.Date.parse=function(s){return _origDate.parse(s)};window.Date.UTC=function(){return _origDateUTC.apply(this,arguments)};window.Date.prototype=_origDate.prototype}};_hookTimer.hook();window.$hookTimer=_hookTimer})();
+</script>
+
+<!-- DEMO LOGIC -->
+<script>
+(function(){var c=document.getElementById('demo-clock'),cv=document.getElementById('counterVal'),p=document.getElementById('demo-progress'),cnt=0,st=Date.now();function uc(){var n=Date.now(),d=new Date(n);c.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0')+'.'+String(d.getMilliseconds()).padStart(3,'0');requestAnimationFrame(uc)}uc();setInterval(function(){cnt++;cv.textContent=cnt},1000);setInterval(function(){var e=(Date.now()-st)/1000;p.style.width=((e%10)/10*100)+'%'},50)})();
+</script>
+
+<!-- UI LOGIC -->
+<script>
+(function(){
+  var HOLE_SPEEDS = [0.5, 1, 2, 5, 20];
+  var MOODS = ['悠然缓缓','清风徐来','行云流水','急管繁弦','瞬息千里'];
+  var GRID_SPEEDS = [0.2, 0.5, 1, 2, 5, 10, 50, 100];
+  var STORAGE_KEY = 'accel_xiao_speed';
+  var PERSIST_KEY = 'accel_xiao_persist';
+  var DRAG_KEY = 'accel_xiao_drag_pos';
+
+  var trigger = document.getElementById('xiao-trigger');
+  var panel = document.getElementById('xiao-panel');
+  var speedTag = document.getElementById('xiaoSpeedTag');
+  var speedNum = document.getElementById('speedNum');
+  var speedMood = document.getElementById('speedMood');
+  var speedGrid = document.getElementById('speedGrid');
+  var holeSelector = document.getElementById('holeSelector');
+  var btnPersist = document.getElementById('btn-persist');
+  var btnReset = document.getElementById('btn-reset');
+  var panelClose = document.getElementById('panel-close');
+  var inkRipple = document.getElementById('inkRipple');
+  var waveSvg = document.getElementById('waveSvg');
+  var panelSeal = document.querySelector('.panel-seal');
+  var speedSlider = document.getElementById('speedSlider');
+  var sliderVal = document.getElementById('sliderVal');
+  var scenePresets = document.getElementById('scenePresets');
+  var inkRippleLayer = document.getElementById('inkRippleLayer');
+  var particleFlowLayer = document.getElementById('particleFlowLayer');
+  var demoCards = document.querySelectorAll('.demo-card');
+  var breathDur = 4;
+
+  var panelOpen = false;
+  var currentSpeed = 1;
+  var currentHole = 1;
+  var persisted = localStorage.getItem(PERSIST_KEY) === 'true';
+  var lastScene = null;
+
+  GRID_SPEEDS.forEach(function(spd){
+    var btn = document.createElement('button');
+    btn.className = 'speed-btn';
+    btn.textContent = spd + 'x';
+    btn.dataset.speed = spd;
+    btn.addEventListener('click', function(){
+      var s = parseFloat(this.dataset.speed);
+      setSpeed(s);
+      playInkRipple();
+    });
+    speedGrid.appendChild(btn);
+  });
+
+  var holeBtns = holeSelector.querySelectorAll('.hole-btn');
+  holeBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var s = parseFloat(this.dataset.speed);
+      var h = parseInt(this.dataset.hole);
+      setSpeed(s, h);
+      playInkRipple();
+    });
+  });
+
+  var sceneBtns = scenePresets.querySelectorAll('.scene-btn');
+  sceneBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var s = parseFloat(this.dataset.speed);
+      setSpeed(s);
+      lastScene = this.dataset.scene;
+      sceneBtns.forEach(function(b){ b.classList.remove('active'); });
+      this.classList.add('active');
+      playInkRipple();
+    });
+  });
+
+  speedSlider.addEventListener('input', function(){
+    var val = parseFloat(this.value);
+    var label = val >= 10 ? Math.round(val) : (Math.round(val*10)/10);
+    sliderVal.textContent = label + 'x';
+    setSpeed(val);
+  });
+
+  function playInkRipple(){
+    inkRipple.classList.remove('active');
+    void inkRipple.offsetWidth;
+    inkRipple.classList.add('active');
+    spawnInkSplash(inkRipple);
+    spawnWaterRipple(trigger);
+  }
+  function spawnInkSplash(origin){
+    var rect = origin.getBoundingClientRect();
+    var cx = rect.left + rect.width/2;
+    var cy = rect.top + rect.height/2;
+    var count = 6 + Math.floor(Math.random()*4);
+    for(var i=0;i<count;i++){
+      var p = document.createElement('div');
+      p.className = 'ink-splash';
+      var angle = (Math.PI * 2 * i / count) + (Math.random()-.5)*.5;
+      var dist = 30 + Math.random()*50;
+      var tx = Math.cos(angle)*dist;
+      var ty = Math.sin(angle)*dist;
+      var size = 3 + Math.random()*6;
+      p.style.width = size+'px';p.style.height = size+'px';
+      p.style.left = cx+'px';p.style.top = cy+'px';
+      p.style.setProperty('--tx', tx+'px');
+      p.style.setProperty('--ty', ty+'px');
+      p.addEventListener('animationend', function(){ this.remove(); });
+      inkRippleLayer.appendChild(p);
+    }
+  }
+  function spawnWaterRipple(origin){
+    var rect = origin.getBoundingClientRect();
+    var cx = rect.left + rect.width/2;
+    var cy = rect.top + rect.height/2;
+    for(var i=0;i<2;i++){
+      var ring = document.createElement('div');
+      ring.className = 'ink-ring';
+      ring.style.left = cx+'px';ring.style.top = cy+'px';
+      ring.style.animationDelay = (i*.15)+'s';
+      ring.addEventListener('animationend', function(){ this.remove(); });
+      inkRippleLayer.appendChild(ring);
+    }
+  }
+  function spawnParticleFlow(origin, speed){
+    var rect = origin.getBoundingClientRect();
+    var cx = rect.left + rect.width/2;
+    var cy = rect.top + 20;
+    var intensity = Math.max(1, Math.round(speed));
+    var count = Math.min(6, 1 + Math.floor(intensity/3));
+    for(var i=0;i<count;i++){
+      (function(ii){
+        setTimeout(function(){
+          var p = document.createElement('div');
+          p.className = 'xiao-particle';
+          var angle = -Math.PI/2 + (Math.random()-.5)*1.2;
+          var dist = 40 + Math.random()*60;
+          var tx = Math.cos(angle)*dist;
+          var ty = Math.sin(angle)*dist;
+          var dur = (1.5 + Math.random()*1.5) + 's';
+          var size = 2 + Math.random()*4;
+          p.style.width = size+'px';p.style.height = size+'px';
+          p.style.left = cx+'px';p.style.top = cy+'px';
+          p.style.setProperty('--p-tx', tx+'px');
+          p.style.setProperty('--p-ty', ty+'px');
+          p.style.setProperty('--p-dur', dur);
+          p.addEventListener('animationend', function(){ this.remove(); });
+          particleFlowLayer.appendChild(p);
+        }, ii * 120);
+      })(i);
+    }
+  }
+
+  demoCards.forEach(function(card){
+    card.addEventListener('mousemove', function(e){
+      var r = card.getBoundingClientRect();
+      card.style.setProperty('--card-mx', ((e.clientX-r.left)/r.width*100)+'%');
+      card.style.setProperty('--card-my', ((e.clientY-r.top)/r.height*100)+'%');
+    });
+    card.addEventListener('mouseleave', function(){
+      card.style.setProperty('--card-mx','50%');
+      card.style.setProperty('--card-my','50%');
+    });
+  });
+
+  function setSpeed(spd, holeIdx){
+    currentSpeed = spd;
+    if(typeof holeIdx === 'number'){ currentHole = holeIdx; }
+    else {
+      var nearest = 1, minDiff = Infinity;
+      for(var i=0;i<HOLE_SPEEDS.length;i++){
+        var diff = Math.abs(Math.log(HOLE_SPEEDS[i]) - Math.log(spd));
+        if(diff < minDiff){ minDiff = diff; nearest = i; }
+      }
+      currentHole = nearest;
+    }
+    window.$hookTimer.setSpeed(spd);
+    window._xiaoCurrentSpeed = spd;
+    // 同步视频倍率（箫旁凤凰绕飞动画）：直接调 setter，不依赖被 hook 缩放的 setInterval 轮询
+    if(window._xiaoVideo && window._xiaoVideo.setSpeed){ window._xiaoVideo.setSpeed(spd); }
+    document.body.setAttribute('data-speed', HOLE_SPEEDS[currentHole]);
+    if(!lastScene){
+      sceneBtns.forEach(function(b){
+        b.classList.toggle('active', Math.abs(parseFloat(b.dataset.speed) - spd) < 0.01);
+      });
+    }
+    spawnParticleFlow(trigger, spd);
+    updateUI();
+    if(persisted) localStorage.setItem(STORAGE_KEY, spd);
+  }
+
+  function updateUI(){
+    var label = currentSpeed >= 10 ? Math.round(currentSpeed) : (Math.round(currentSpeed*10)/10);
+    speedTag.textContent = label + 'x';
+    speedNum.textContent = label;
+    speedMood.textContent = MOODS[currentHole];
+    speedMood.classList.remove('flash');void speedMood.offsetWidth;speedMood.classList.add('flash');
+    sliderVal.textContent = label + 'x';
+    speedSlider.value = currentSpeed;
+    holeBtns.forEach(function(b, i){ b.classList.toggle('active', i === currentHole); });
+    var btns = speedGrid.querySelectorAll('.speed-btn');
+    for(var j=0;j<btns.length;j++){
+      btns[j].classList.toggle('active', Math.abs(parseFloat(btns[j].dataset.speed) - currentSpeed) < 0.01);
+    }
+    if(persisted){btnPersist.classList.add('active-persist');btnPersist.textContent='已铭';panelSeal.classList.add('stamped');}
+    else{btnPersist.classList.remove('active-persist');btnPersist.textContent='铭记';panelSeal.classList.remove('stamped');}
+    var animSpeed = Math.max(0.3, 2 / currentSpeed);
+    var waveAnims = waveSvg.querySelectorAll('animate');
+    waveAnims.forEach(function(anim){
+      var baseDur = parseFloat(anim.dataset.baseDur || anim.getAttribute('dur'));
+      anim.dataset.baseDur = baseDur;
+      anim.setAttribute('dur', (baseDur * animSpeed) + 's');
+    });
+    var soundWaves = trigger.querySelectorAll('.sound-wave');
+    soundWaves.forEach(function(w){ w.style.animationDuration = Math.max(0.5, 2 / currentSpeed) + 's'; });
+    breathDur = Math.max(0.6, 4 / Math.sqrt(currentSpeed));
+    particleFlowLayer.style.zIndex = 99997;
+  }
+
+  function togglePanel(open){
+    panelOpen = typeof open === 'boolean' ? open : !panelOpen;
+    panel.classList.toggle('open', panelOpen);
+  }
+  trigger.addEventListener('click', function(e){
+    if(trigger._dragged){ trigger._dragged = false; return; }
+    togglePanel();
+    playInkRipple();
+    spawnParticleFlow(trigger, currentSpeed);
+  });
+  panelClose.addEventListener('click', function(){ togglePanel(false); });
+
+  btnPersist.addEventListener('click', function(){
+    persisted = !persisted;
+    if(persisted){ localStorage.setItem(PERSIST_KEY,'true'); localStorage.setItem(STORAGE_KEY,currentSpeed); }
+    else{ localStorage.setItem(PERSIST_KEY,'false'); localStorage.removeItem(STORAGE_KEY); }
+    updateUI();
+  });
+  btnReset.addEventListener('click', function(){ setSpeed(1, 1); playInkRipple(); });
+
+  document.addEventListener('keydown', function(e){
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+    if(e.key==='['||e.key==='\u3010'){var h=Math.max(0,currentHole-1);setSpeed(HOLE_SPEEDS[h],h);}
+    else if(e.key===']'||e.key==='\u3011'){var h2=Math.min(HOLE_SPEEDS.length-1,currentHole+1);setSpeed(HOLE_SPEEDS[h2],h2);}
+    else if(e.key==='0'){setSpeed(1,1);}
+    else if(e.key==='p'||e.key==='P'){btnPersist.click();}
+    else if(e.key==='Escape'){togglePanel(false);}
+  });
+
+  (function(){
+    var dragging=false,startX,startY,origLeft,origTop,moved=false;
+    function onDown(e){
+      dragging=true;moved=false;
+      var ev=e.touches?e.touches[0]:e;startX=ev.clientX;startY=ev.clientY;
+      var r=trigger.getBoundingClientRect();origLeft=r.left;origTop=r.top;
+      trigger.classList.add('dragging');e.preventDefault();
+    }
+    function onMove(e){
+      if(!dragging)return;
+      var ev=e.touches?e.touches[0]:e;
+      var dx=ev.clientX-startX,dy=ev.clientY-startY;
+      if(Math.abs(dx)>3||Math.abs(dy)>3)moved=true;
+      var tw=trigger.offsetWidth,th=trigger.offsetHeight;
+      var nl=Math.max(0,Math.min(window.innerWidth-tw,origLeft+dx));
+      var nt=Math.max(0,Math.min(window.innerHeight-th,origTop+dy));
+      trigger.style.left=nl+'px';trigger.style.top=nt+'px';
+      trigger.style.transform='translateY(0)';
+      var ph=panel.offsetHeight||440;
+      panel.style.top=Math.max(0,Math.min(window.innerHeight-ph,nt+th/2-ph/2))+'px';
+      panel.style.right='auto';panel.style.left=(nl+tw+8)+'px';
+      panel.style.transform='translateY(0)';
+    }
+    function onUp(){
+      if(!dragging)return;
+      dragging=false;trigger.classList.remove('dragging');trigger._dragged=moved;
+      localStorage.setItem(DRAG_KEY,JSON.stringify({left:trigger.style.left,top:trigger.style.top,panelTop:panel.style.top,panelLeft:panel.style.left}));
+    }
+    trigger.addEventListener('mousedown',onDown);document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
+    trigger.addEventListener('touchstart',onDown,{passive:false});document.addEventListener('touchmove',onMove,{passive:false});document.addEventListener('touchend',onUp);
+  })();
+
+  (function(){
+    try{
+      var saved=JSON.parse(localStorage.getItem(DRAG_KEY));
+      if(saved&&saved.left){
+        trigger.style.left=saved.left;trigger.style.top=saved.top;
+        trigger.style.transform='translateY(0)';
+        if(saved.panelTop){panel.style.top=saved.panelTop;panel.style.right='auto';panel.style.left=saved.panelLeft;panel.style.transform='translateY(0)';}
+      }
+    }catch(e){}
+  })();
+
+  if(persisted){var saved=parseFloat(localStorage.getItem(STORAGE_KEY));if(saved&&saved>0){currentSpeed=saved;var idx=1,md=Infinity;for(var i=0;i<HOLE_SPEEDS.length;i++){var d=Math.abs(Math.log(HOLE_SPEEDS[i])-Math.log(saved));if(d<md){md=d;idx=i;}}currentHole=idx;window._xiaoCurrentSpeed=saved;window.$hookTimer.setSpeed(saved);}}
+  document.body.setAttribute('data-speed', HOLE_SPEEDS[currentHole]);
+  updateUI();
+})();
+</script>
+
+<!-- CHROMA-KEY VIDEO XIAO (xiao02.webm + SVG filter + speed linkage) -->
+<script>
+(function(){
+  var video = document.getElementById('xiaoVideo');
+  if(!video) return;
+  window._xiaoVideo = video;
+
+  function applySpeed(){
+    var spd = window._xiaoCurrentSpeed || 1;
+    // Clamp playbackRate to a sane range: 0.25x .. 16x
+    var rate = Math.max(0.25, Math.min(16, spd));
+    video.playbackRate = rate;
+  }
+
+  video.addEventListener('loadeddata', function(){
+    video.play().catch(function(){});
+    applySpeed();
+  });
+  video.addEventListener('play', function(){ applySpeed(); });
+
+  // Also expose a setter the UI can call directly
+  window._xiaoVideo.setSpeed = applySpeed;
+
+  // Initial speed sync if UI already set it
+  applySpeed();
+
+  // rAF fallback: the speed hooks scale setInterval, so setInterval polling never fires here.
+  // rAF ticks on the real display refresh and is unaffected by the hooks.
+  var lastPoll = 0;
+  function pollSpeed(){
+    var t = performance.now();
+    if(t - lastPoll >= 500){
+      lastPoll = t;
+      var spd = window._xiaoCurrentSpeed || 1;
+      var r = Math.max(0.25, Math.min(16, spd));
+      if(Math.abs(video.playbackRate - r) > 0.01){ video.playbackRate = r; }
+    }
+    requestAnimationFrame(pollSpeed);
+  }
+  requestAnimationFrame(pollSpeed);
+})();
+</script>
+</body>
+</html>
