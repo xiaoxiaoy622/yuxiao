@@ -1,0 +1,44 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset='utf-8'/>
+<meta http-equiv='Pragma' content='no-cache' />
+<meta http-equiv='Cache-Control' content='no-cache' />
+<meta name='renderer' content='webkit' />
+<meta http-equiv='X-UA-Compatible' content='IE=edge,chrome=1' />
+<meta name='viewport' content='width=device-width,initial-scale=1.0,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no'/>
+<meta name='full-screen' content='true' />
+<meta name='screen-orientation' content='portrait' />
+<meta name='laya' layajsprotect='true' logoimg='logo.png' logobkcolor='#000000' screenorientation='portrait' cacheid='fffffffff' />
+<title>潇潇烟雨</title>
+</head>
+<body style="margin:0;overflow:hidden;background-color:#000;">
+
+<script>
+var cdn = "";
+// Debug: log errors to screen
+window.__errs = [];
+window.onerror = function (msg, url, line) {
+  window.__errs.push({ msg: msg, url: url, line: line });
+  var div = document.getElementById('__err') || (function(){
+    var d = document.createElement('div');
+    d.id = '__err';
+    d.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(0,0,0,.85);color:#0f0;font:12px monospace;padding:8px;max-height:40vh;overflow:auto;white-space:pre-wrap;word-break:break-all;';
+    document.body.appendChild(d);
+    return d;
+  })();
+  div.innerHTML = msg + ' (' + url + ':' + line + ')' + '<br>' + div.innerHTML;
+  return true;
+};
+window.onunhandledrejection = function (e) {
+  window.onerror(e.reason && e.reason.message || String(e.reason), '', 0);
+};
+</script>
+
+<script src="cc.js" loader='laya'></script>
+<script src="skin.js"></script>
+<script src="enter.js" loader='laya'></script>
+<script src="玉箫加速.js"></script>
+
+</body>
+</html>
