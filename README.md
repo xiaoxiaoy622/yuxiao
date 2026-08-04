@@ -31,7 +31,7 @@
 |-|-|
 |`x5\_login.json`|**sprite 图集配置**，定义登录界面各元素的坐标和尺寸|
 |`x5\_login.png`|**sprite 图集图片**，包含登录按钮、背景、图标等|
-|`bg.jpg`|登录界面**主背景图**|
+|`bg.jpg`|登录界面**主背景图**， 微信 X5（不支持 AV1）	自动降级为静态透明 PNG|
 |`bottom\_1.jpg`、`bottom\_2.jpg`|登录界面**底部装饰图**|
 |`denglu\_img\_logo.png`|登录界面**游戏 logo**|
 |`loadingFlower.png`、`loadingRound.png`|**加载动画资源**（花朵旋转效果）|
